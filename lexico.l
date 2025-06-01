@@ -3,25 +3,15 @@
 %}
 digito              [0-9]
 letra               [a-zA-Z]
-entero              {digito}+
 
 %%
-[ \n\t]+                                    ;
-"--"(.*)[\n]                                ;
-begin                                       return BEGINN;
-end                                         return END;
-read                                        return READ;
-write                                       return WRITE;
-{letra}({letra}|{digito}|_)*                return ID;
-{entero}                                    return INTLITERAL;
-"("                                         return LPAREN;		
-")"                                         return RPAREN;
-";"                                         return SEMICOLON;
-","                                         return COMMA;
-":="                                        return ASSIGNOP;
-"+"                                         return PLUSOP;
-"-"                                         return MINUSOP;
-{entero}[.]{entero}                         return REALLIT;
+//              VALORES LITERALES
+-{digito}{1,10}                             return INTNEG;
+{digito}{1,10}                              return INTPOS;
+\"([^\\\"]|\\[\"tnr\\])*\"                  return CADENA;
+//              IDENTIFICADORES
+({letra}|_){digito}{0,31}                   return ID;
+//              PALABRAS RESERVADAS
 var                                         return VAR;
 const                                       return CONST;
 int                                         return INT;
@@ -29,5 +19,22 @@ if                                          return IF;
 else                                        return ELSE;
 while                                       return WHILE;
 printf                                      return PRINTF;
+read                                        return READ;
+{entero}                                    return INTLITERAL;
+//              CARACTERES ESPECIALES
+";"                                         return DOTCOMMA;
+","                                         return COMMA;
+"+"                                         return PLUSOP;
+"-"                                         return MINUSOP;
+"*"                                         return MULTOP;
+"/"                                         return DIVOP;
+"("                                         return LPAREN;
+")"                                         return RPAREN;
+"{"                                         return LBRACE;
+"}"                                         return RBRACE;
+"?"                                         return QMARK;
+":"                                         return COLON;
+
+{entero}[.]{entero}                         return REALLIT;
 .                                           printf("Error en carácter %s",yytext );
 %%
