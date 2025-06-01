@@ -1,5 +1,5 @@
 %{
-#include "lexico1.h"
+#include "lexico.h"
 int error_lexico = 0;  
 void error_lexico();  
 %}
