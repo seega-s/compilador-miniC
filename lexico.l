@@ -1,15 +1,29 @@
 %{
 #include "lexico1.h"
+int error_lexico = 0;  
+void error_lexico();  
 %}
 digito              [0-9]
 letra               [a-zA-Z]
 %%
-//              VALORES LITERALES
--?{digito}{1,10}                            return ENTERO;
-\"([^\\\"]|\\[\"tnr\\])*\"                  return CADENA;
-//              IDENTIFICADORES
-({letra}|_){digito}{0,31}                   return ID;
-//              PALABRAS RESERVADAS
+ //              VALORES LITERALES
+-?{digito}{1,10}                            {                          
+                                                yylval.cadena = strdup(yytext);
+                                                return ENTERO;
+                                            }
+\"([^\\\"]|\\[\"tnr\\])*\"                  {
+                                                yylval.cadena = strdup(yytext);
+                                                return CADENA;
+                                            }
+ //              IDENTIFICADOR
+({letra}|_){digito}{0,31}                   {   if (yyleng > 32)
+                                                    error_lexico("ID tiene más de 32 caracteres");
+                                                else{
+                                                    yylval.cadena=strdup(yytext);
+                                                    return ID;
+                                                }}
+                                                    
+ //              PALABRAS RESERVADAS
 var                                         return VAR;
 const                                       return CONST;
 int                                         return INT;
@@ -18,7 +32,7 @@ else                                        return ELSE;
 while                                       return WHILE;
 printf                                      return PRINTF;
 read                                        return READ;    
-//              CARACTERES ESPECIALES
+ //              CARACTERES ESPECIALES
 ";"                                         return DOTCOMMA;
 ","                                         return COMMA;
 "+"                                         return PLUSOP;
@@ -31,10 +45,15 @@ read                                        return READ;
 "}"                                         return RBRACE;
 "?"                                         return QMARK;
 ":"                                         return COLON;
-//              COMENTARIOS
-//  \/\/.* com una linea version2
-"//".*
-"/*"([^*]|\*[^/])*\*\/
+ //              COMENTARIOS    UNA // y MuLTI /**/
+\/\/.*                                      ;
+"/*"([^*]|\*[^/])*\*\/                      ;
 
-.                                           printf("Error en carácter %s",yytext );
+ //              E
+.+                                          return error_lexico();
+
 %%
+void error_lexico(){
+    error_lexico++;
+    printf("Error léxico en la línea %d: %s \n", yylineno, yytext);
+}
