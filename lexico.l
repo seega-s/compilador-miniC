@@ -3,11 +3,9 @@
 %}
 digito              [0-9]
 letra               [a-zA-Z]
-
 %%
 //              VALORES LITERALES
--{digito}{1,10}                             return INTNEG;
-{digito}{1,10}                              return INTPOS;
+-?{digito}{1,10}                            return ENTERO;
 \"([^\\\"]|\\[\"tnr\\])*\"                  return CADENA;
 //              IDENTIFICADORES
 ({letra}|_){digito}{0,31}                   return ID;
@@ -19,8 +17,7 @@ if                                          return IF;
 else                                        return ELSE;
 while                                       return WHILE;
 printf                                      return PRINTF;
-read                                        return READ;
-{entero}                                    return INTLITERAL;
+read                                        return READ;    
 //              CARACTERES ESPECIALES
 ";"                                         return DOTCOMMA;
 ","                                         return COMMA;
@@ -34,7 +31,10 @@ read                                        return READ;
 "}"                                         return RBRACE;
 "?"                                         return QMARK;
 ":"                                         return COLON;
+//              COMENTARIOS
+//  \/\/.* com una linea version2
+"//".*
+"/*"([^*]|\*[^/])*\*\/
 
-{entero}[.]{entero}                         return REALLIT;
 .                                           printf("Error en carácter %s",yytext );
 %%
