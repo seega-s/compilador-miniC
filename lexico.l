@@ -1,27 +1,25 @@
 %{
 #include "lexico.h"
-int n_err_lexico = 0;  
+#include "math.h" 
+#include "listaSimbolos.h"
 void error_lexico();  
 %}
 digito              [0-9]
 letra               [a-zA-Z]
+entero              {digito}+
+id                  ({letra}|_)(_|{digito}|{letra})*
+cadena              \"([^"\n\\]|\\[ntr"])*\"
+
+%option yylineno
+
 %%
- /* VALORES LITERALES */
--?{digito}{1,10}                            {   yylval.cadena = strdup(yytext);
-                                                return ENTERO;
-                                            }
-\"([^\\\"]|\\[\"tnr\\])*\"                  {   yylval.cadena = strdup(yytext);
-                                                return CADENA;
-                                            }
- /* IDENTIFICADOR */
-({letra}|_){digito}{0,31}                   {   if (yyleng > 32)
-                                                    error_lexico("ID tiene más de 32 caracteres");
-                                                else{
-                                                    yylval.cadena=strdup(yytext);
-                                                    return ID;
-                                                }
-                                            }
-                                                    
+
+ /* COMENTARIOS Y CARACTERES QUE HAY QUE SKIPPEAR (saltos, tabs, etc.) */
+"//".*[\n]                                  ;
+"/*"([^*]|\*[^/])*\*\/                      ;
+[ \n\t\r]+                            	    ;
+
+
  /* PALABRAS RESERVADAS */
 "var"                                       return VAR;
 "const"                                     return CONST;
@@ -44,15 +42,33 @@ letra               [a-zA-Z]
 "}"                                         return RBRACE;
 "?"                                         return QMARK;
 ":"                                         return COLON;
- /* COMENTARIOS UNA // y MuLTI /**/ */
-\/\/.*                                      ;
-"/*"([^*]|\*[^/])*\*\/                      ;
 
  /* ERRORES TODO LO QUE NO SEA + FUNCION */
-.+                                          return error_lexico();
+([^A-Za-z0-9_\+\-\/\*{}()<>!=;,"\[\?\:\n])*  error_lexico(); // todo lo que no sea lo anterior
+
+ /* VALORES LITERALES */
+{entero}                                    {   if(atol(yytext)>pow(2,31))
+                                    		        error_lexico("entero más grande que 2^31");
+                                                else{
+                                                    yylval.cadena = strdup(yytext);
+                                                    return ENTERO;
+                                                }
+                                            }
+{cadena}                                    {   yylval.cadena = strdup(yytext);
+                                                return CADENA;
+                                            }
+ /* IDENTIFICADOR */
+{id}                                        {   if (yyleng > 32)
+                                                    error_lexico("ID tiene más de 32 caracteres");
+                                                else{
+                                                    yylval.cadena=strdup(yytext);
+                                                    return ID;
+                                                }
+                                            }
+                                                    
+
 
 %%
 void error_lexico(){
-    n_err_lexico++;
     printf("Error léxico en la línea %d: %s \n", yylineno, yytext);
 }
