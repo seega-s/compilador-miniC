@@ -6,10 +6,6 @@ void error_lexico();
 %}
 digito              [0-9]
 letra               [a-zA-Z]
-entero              {digito}+
-id                  ({letra}|_)(_|{digito}|{letra})*
-cadena              \"([^"\n\\]|\\[ntr"])*\"
-
 %option yylineno
 
 %%
@@ -42,32 +38,30 @@ cadena              \"([^"\n\\]|\\[ntr"])*\"
 "}"                                         return RBRACE;
 "?"                                         return QMARK;
 ":"                                         return COLON;
+"="                                         return ASIGN;
 
  /* ERRORES TODO LO QUE NO SEA + FUNCION */
-([^A-Za-z0-9_\+\-\/\*{}()<>!=;,"\[\?\:\n])*  error_lexico(); // todo lo que no sea lo anterior
+.                                           error_lexico(); // todo lo que no sea lo anterior
 
  /* VALORES LITERALES */
-{entero}                                    {   if(atol(yytext)>pow(2,31))
+{digito}+                                   {   if(atol(yytext)>pow(2,31))
                                     		        error_lexico("entero más grande que 2^31");
                                                 else{
-                                                    yylval.cadena = strdup(yytext);
+                                                    yylval.lexema = strdup(yytext);
                                                     return ENTERO;
                                                 }
                                             }
-{cadena}                                    {   yylval.cadena = strdup(yytext);
+\"([^"\n\\]|\\[ntr"])*\"                    {   yylval.lexema= strdup(yytext);
                                                 return CADENA;
                                             }
  /* IDENTIFICADOR */
-{id}                                        {   if (yyleng > 32)
+({letra}|_)(_|{digito}|{letra})*            {   if (yyleng > 32)
                                                     error_lexico("ID tiene más de 32 caracteres");
                                                 else{
-                                                    yylval.cadena=strdup(yytext);
+                                                    yylval.lexema =strdup(yytext);
                                                     return ID;
                                                 }
                                             }
-                                                    
-
-
 %%
 void error_lexico(){
     printf("Error léxico en la línea %d: %s \n", yylineno, yytext);
