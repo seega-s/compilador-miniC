@@ -41,7 +41,7 @@ letra               [a-zA-Z]
 "="                                         return ASIGN;
 
  /* ERRORES TODO LO QUE NO SEA + FUNCION */
-.                                           error_lexico(); // todo lo que no sea lo anterior
+([^A-Za-z0-9_\+\-\/\*{}();,"\[\?\:\n\r\t\ ])+   error_lexico(); // todo lo que no sea lo anterior
 
  /* VALORES LITERALES */
 {digito}+                                   {   if(atol(yytext)>pow(2,31))
@@ -56,7 +56,7 @@ letra               [a-zA-Z]
                                             }
  /* IDENTIFICADOR */
 ({letra}|_)(_|{digito}|{letra})*            {   if (yyleng > 32)
-                                                    error_lexico("ID tiene más de 32 caracteres");
+                                                    error_lexico("ID tiene más de 32 caracteres");  // return id para que el sintactico no se quede esperando
                                                 else{
                                                     yylval.lexema =strdup(yytext);
                                                     return ID;
