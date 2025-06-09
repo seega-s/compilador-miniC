@@ -22,6 +22,16 @@ void inicializaTemporales();
 int nuevoTemp();
 char* nuevaEtiq();
 
+void imprimirTablaS();
+void imprimeLC(ListaC codigo);
+bool perteneceTablaS(char *nombre);
+void anadeEntrada(char *nombre, Tipo t, int v);
+bool esConstante(char *nombre);
+Operacion operSaltoCond(char *op, char *exp, char *etiq);
+Operacion operEtiq(char *etiq);
+Operacion crearOpArit(char *op, char *oper1, char *oper2, char tempStr[5]);
+
+
 int yylex(); // en semBison dice que tiene que ser declarado
 void yyerror(char *s);
 
@@ -29,8 +39,8 @@ void yyerror(char *s);
 %code requires{#include "listaCodigo.h"}
 %union{char *lexema; ListaC  codigo;}
 
-%token <lexema> CADENA ID ENTERO
-%token VAR CONST INT IF ELSE WHILE PRINTF READ DOTCOMMA COMMA PLUSOP MINUSOP MULTOP DIVOP LPAREN RPAREN LBRACE RBRACE QMARK COLON ASIGN
+%token <lexema> STRING ID ENTERO
+%token VAR CONST INT IF ELSE WHILE PRINTF READ DOTCOMMA COMMA PLUSOP MINUSOP MULTOP DIVOP LPAREN RPAREN LBRACE RBRACE QMARK COLON ASIGN MINUSOP_UN
 %type <codigo> expression statement statement_list print_list print_item read_list declarations var_list const_list
 
 %left PLUSOP MINUSOP MULTOP DIVOP ASIGN
@@ -46,7 +56,7 @@ program     : {tablaSimb = creaLS();} ID LPAREN RPAREN LBRACE declarations state
                                                                                                     liberaLC($7);
                                                                                                     imprimirTablaS();
                                                                                                     imprimeLC(codigo);
-                                                                                                    liberaLC(tablaSimb);
+                                                                                                    liberaLS(tablaSimb);
                                                                                                     liberaLC(codigo); 
                                                                                                 }
                                                                                                 ;
@@ -71,7 +81,7 @@ tipo        : INT
 
 var_list    : ID                            {  
                                                 if(!perteneceTablaS($1))
-                                                    anadeEntrada($1, VARIABLE, NULL);
+                                                    anadeEntrada($1, VARIABLE, 0);
                                                 else {
                                                     printf("Error semántico: Variable ya declarada '%s' (linea: %d)\n", yylineno, $1);
                                                     YYERROR; // en semBison pone que hay que abortar así
@@ -79,7 +89,7 @@ var_list    : ID                            {
                                             }
 	        | var_list COMMA ID             {   
                                                 if (!perteneceTablaS($3))
-                                                    anadeEntrada($3, VARIABLE, NULL);
+                                                    anadeEntrada($3, VARIABLE, 0);
                                                 else {
                                                     printf("Error semántico: Variable ya declarada '%s' (linea: %d)\n", yylineno, $1);
                                                     YYERROR; // en semBison pone que hay que abortar así
@@ -89,10 +99,10 @@ var_list    : ID                            {
 
 const_list  : ID ASIGN expression           {   
                                                 if (!perteneceTablaS($1)){
-                                                    anadeEntrada($1, CONSTANTE, NULL);
+                                                    anadeEntrada($1, CONSTANTE, 0);
                                                     ListaC codigo = $3;
                                                     char nomVar[20];
-                                                    sprintf(nomVar, "_%s", %1);
+                                                    sprintf(nomVar, "_%s", $1);
                                                     Operacion op = {
                                                         .op = "sw",
                                                         .res = recuperaResLC(codigo),
@@ -101,8 +111,9 @@ const_list  : ID ASIGN expression           {
                                                     };
                                                     insertaLC(codigo, finalLC(codigo), op);
                                                     $$ = codigo;
-                                                    liberaLC($3);
+                                                    //liberaLC($3);
                                                     inicializaTemporales(); //liberar registros resultado 
+                                                    
                                                 }
                                                 else {
                                                     printf("Error semántico: Variable ya declarada '%s' (linea: %d)\n", yylineno, $1);
@@ -111,20 +122,24 @@ const_list  : ID ASIGN expression           {
                                             }
 	        | const_list COMMA ID ASIGN expression  { 
                                                         if (!perteneceTablaS($3)){
-                                                            anadeEntrada($3, CONSTANTE, NULL);
+                                                            anadeEntrada($3, CONSTANTE, 0);
                                                             ListaC codigo = $5;
                                                             char nombreVar[20];
-                                                            sprintf(nombreVar, "_%s", %3);
+                                                            sprintf(nombreVar, "_%s", $3);
                                                             Operacion op = {
                                                                 .op = "sw",
                                                                 .res = recuperaResLC(codigo),
-                                                                .arg1 = strdup(nomVar),
+                                                                .arg1 = strdup(nombreVar),
                                                                 .arg2 = NULL,
                                                             };
                                                             insertaLC(codigo, finalLC(codigo), op);
                                                             $$ = codigo;
-                                                            liberaLC($5);
+                                                            //liberaLC($5);
                                                             inicializaTemporales();
+                                                        }
+                                                        else {
+                                                            printf("Error semántico: Constante ya declarada '%s' (linea: %d)\n", yylineno, $1);
+                                                            YYERROR; // Aborta el análisis sintáctico****
                                                         }
                                                     }
                                                     ;
@@ -140,9 +155,10 @@ statement_list  : statement_list statement  {
                                             ;
 	    
 statement   : ID ASIGN expression DOTCOMMA  {   
-                                                if (perteneceTablaS($1))
+                                                if (!perteneceTablaS($1)){
                                                     printf("Error semántico: Variable no declarada '%s' (linea: %d)\n", yylineno, $1);
                                                     YYERROR;
+                                                }
                                                 else if (esConstante($1)){
                                                     printf("Error semántico: Asignación a constante '%s' (linea: %d)\n", yylineno, $1);
                                                     YYERROR;
@@ -151,7 +167,7 @@ statement   : ID ASIGN expression DOTCOMMA  {
                                                     $$ = creaLC();
                                                     concatenaLC($$, $3);
                                                     char nombreVar[20];
-                                                    // no uso la funcion porque no tengo que recuperar el 
+                                                    // no uso la funcion porque no tengo que recuperar
                                                     sprintf(nombreVar, "_%s", $1);
                                                     Operacion op = {
                                                         .op = "sw",
@@ -174,7 +190,7 @@ statement   : ID ASIGN expression DOTCOMMA  {
 
                                                                         //ANALISIS, si se da se salta al if
                                                                         concatenaLC($$, $3);
-                                                                        Operacion opCond = operSaltoCond("bnez", $3, etiqIf);
+                                                                        Operacion opCond = operSaltoCond("bnez", recuperaResLC($3), etiqIf);
                                                                         insertaLC($$, finalLC($$), opCond);
                                                                         inicializaTemporales();
                                                                         
@@ -206,18 +222,20 @@ statement   : ID ASIGN expression DOTCOMMA  {
                                                                     }
             | IF LPAREN expression RPAREN statement {
                                                         $$ = creaLC();
-                                                        char* EtiqFin = nuevaEtiq();
+                                                        char* etiqFin = nuevaEtiq();
                                                         
                                                         concatenaLC($$, $3);
-                                                        Operacion opCond = operSaltoCond("beqz", $3, etiqFin);
+                                                        Operacion opCond = operSaltoCond("beqz", recuperaResLC($3), etiqFin);
                                                         insertaLC($$, finalLC($$), opCond);
+
+                                                        inicializaTemporales();
+                                                        concatenaLC($$, $5);
                                                         liberaLC($5);
 
                                                         Operacion opEtiq = operEtiq(etiqFin);
                                                         insertaLC($$, finalLC($$), opEtiq);
                                                         liberaLC($3);
                                                         inicializaTemporales();
-
                                                     }
             | WHILE LPAREN expression RPAREN statement  { 
                                                             $$ = creaLC();
@@ -228,9 +246,9 @@ statement   : ID ASIGN expression DOTCOMMA  {
                                                             Operacion opEtiqW = operEtiq(etiqWhile);
                                                             insertaLC($$, finalLC($$), opEtiqW);
 
-                                                            concatena($$, $3);
+                                                            concatenaLC($$, $3);
 
-                                                            Operacion opCond = operSaltoCond("beqz", $3, etiqFin);
+                                                            Operacion opCond = operSaltoCond("beqz", recuperaResLC($3), etiqFin);
                                                             insertaLC($$, finalLC($$), opCond);
                                                             liberaLC($3);
                                                             inicializaTemporales();
@@ -253,15 +271,17 @@ statement   : ID ASIGN expression DOTCOMMA  {
                                                             Operacion opEtiqFin = operEtiq(etiqFin);
                                                             insertaLC($$, finalLC($$), opEtiqFin);
                                                         }
-            | PRINT LPAREN print_list RPAREN DOTCOMMA   {
+                                                        ;
+            | PRINTF LPAREN print_list RPAREN DOTCOMMA  {
                                                             $$ = creaLC();
                                                             concatenaLC($$, $3);
-                                                            liberaLC($3)
+                                                            liberaLC($3);
                                                         }
+                                                        ;
             | READ LPAREN read_list RPAREN DOTCOMMA     { 
                                                             $$ = creaLC();
                                                             concatenaLC($$, $3);
-                                                            liberaLC($3)
+                                                            liberaLC($3);
                                                         }
                                                         ;
 
@@ -282,8 +302,8 @@ print_item  : expression                    {
                                                 // syscall
                                                 Operacion op1 = {
                                                     .op = "li",
-                                                    .res = "$v0"    // primer resultado de syscall
-                                                    .arg1 = "1"     // syscall de printear strings
+                                                    .res = "$v0",    // primer resultado de syscall
+                                                    .arg1 = "1",     // syscall de printear strings
                                                     .arg2 = NULL
                                                 };
                                                 insertaLC($$, finalLC($$), op1);
@@ -291,7 +311,7 @@ print_item  : expression                    {
                                                 Operacion op2 = {
                                                     .op = "la",
                                                     .res = "$a0",
-                                                    .arg1 = recuperaLS($1),
+                                                    .arg1 = recuperaResLC($1),
                                                     .arg2 = NULL
                                                 };
                                                 insertaLC($$, finalLC($$), op2);
@@ -304,19 +324,24 @@ print_item  : expression                    {
                                                 };
                                                 insertaLC($$, finalLC($$), op3);
                                             }       
-	        | CADENA                        {
+	        | STRING                        {
                                                 $$ = creaLC();
                                                 contCadenas++;
-                                                anadeEntrada($1, CADENA, contCadenas);
+                                                Simbolo s;
+                                                s.nombre = $1;
+                                                s.tipo = CADENA;
+                                                s.valor = contCadenas;
+                                                insertaLS(tablaSimb, finalLS(tablaSimb), s);
+
                                                 char nomCadena[50];
-                                                sprintf(tablaSimb, finalLS(tablaSimb), s);
+                                                sprintf(nomCadena, "str_%d", s.valor);
                                                 // li   $v0, 4              se carga la syscall que queremos hacer
                                                 // la   $a0, nombreCadena   se carga como parametro de la syscall la direccion de la cadena
                                                 // syscall
                                                 Operacion op1 = {
                                                     .op = "li",
-                                                    .res = "$v0"    // primer resultado de syscall
-                                                    .arg1 = "4"     // syscall de printear strings
+                                                    .res = "$v0",    // primer resultado de syscall
+                                                    .arg1 = "4",     // syscall de printear strings
                                                     .arg2 = NULL
                                                 };
                                                 insertaLC($$, finalLC($$), op1);
@@ -324,7 +349,7 @@ print_item  : expression                    {
                                                 Operacion op2 = {
                                                     .op = "la",
                                                     .res = "$a0",
-                                                    .arg1 = strdup(nombreCadena),
+                                                    .arg1 = strdup(nomCadena),
                                                     .arg2 = NULL
                                                 };
                                                 insertaLC($$, finalLC($$), op2);
@@ -426,43 +451,59 @@ expression  : expression PLUSOP expression  {
                                                 concatenaLC($$, $1);
                                                 concatenaLC($$, $3);
 
-                                                Operacion op = crearOpArit("add", $1, $3);
+                                                int temp = nuevoTemp();
+                                                char tempStr[5];
+                                                sprintf(tempStr, "$t%d", temp);
+
+                                                Operacion op = crearOpArit("add", recuperaResLC($1), recuperaResLC($3), tempStr);
 
                                                 liberaLC($1);
                                                 liberaLC($3);
                                                 insertaLC($$, finalLC($$), op);
                                                 guardaResLC($$, strdup(tempStr));
                                             }
-            | expression MINUS expression   { 
+            | expression MINUSOP expression { 
                                                 $$ = creaLC();
                                                 concatenaLC($$, $1);
                                                 concatenaLC($$, $3);
 
-                                                Operacion op = crearOpArit("sub", $1, $3);
+                                                int temp = nuevoTemp();
+                                                char tempStr[5];
+                                                sprintf(tempStr, "$t%d", temp);
+
+                                                Operacion op = crearOpArit("sub", recuperaResLC($1), recuperaResLC($3), tempStr);
+                                                
+                                                liberaLC($1);
+                                                liberaLC($3);
+                                                insertaLC($$, finalLC($$), op);
+                                                guardaResLC($$, strdup(tempStr));
+                                            }
+            | expression MULTOP expression  { 
+                                                $$ = creaLC();
+                                                concatenaLC($$, $1);
+                                                concatenaLC($$, $3);
+
+                                                int temp = nuevoTemp();
+                                                char tempStr[5];
+                                                sprintf(tempStr, "$t%d", temp);
+
+                                                Operacion op = crearOpArit("mul", recuperaResLC($1), recuperaResLC($3), tempStr);
 
                                                 liberaLC($1);
                                                 liberaLC($3);
                                                 insertaLC($$, finalLC($$), op);
                                                 guardaResLC($$, strdup(tempStr));
                                             }
-            | expression MUL expression     { 
+            | expression DIVOP expression   { 
                                                 $$ = creaLC();
                                                 concatenaLC($$, $1);
                                                 concatenaLC($$, $3);
 
-                                                Operacion op = crearOpArit("mul", $1, $3);
+                                                int temp = nuevoTemp();
+                                                char tempStr[5];
+                                                sprintf(tempStr, "$t%d", temp);
 
-                                                liberaLC($1);
-                                                liberaLC($3);
-                                                insertaLC($$, finalLC($$), op);
-                                                guardaResLC($$, strdup(tempStr));
-                                            }
-            | expression DIV expression     { 
-                                                $$ = creaLC();
-                                                concatenaLC($$, $1);
-                                                concatenaLC($$, $3);
-
-                                                Operacion op = crearOpArit("div", $1, $3);
+                                                Operacion op = crearOpArit("div", recuperaResLC($1), recuperaResLC($3), tempStr);
 
                                                 liberaLC($1);
                                                 liberaLC($3);
@@ -473,7 +514,7 @@ expression  : expression PLUSOP expression  {
                                             { 
                                                 $$ = creaLC();
                                                 char* etiqT = nuevaEtiq();
-                                                char* etiqF = nuevaEtiq();
+                                                char* etiqFin = nuevaEtiq();
                                                 // aclaraacion para el codigo y todo, el ternario es:
                                                 // if(expresion1)
                                                 //      expresion2
@@ -487,7 +528,7 @@ expression  : expression PLUSOP expression  {
                                                 // ANALISIS CASO
                                                 concatenaLC($$, $2);
                                                 
-                                                Operacion op1 = operSaltoCond("bnez", $2, etiqTrue);
+                                                Operacion op1 = operSaltoCond("bnez", recuperaResLC($2), etiqT);
 
                                                 insertaLC($$, finalLC($$), op1);
                                                 liberaLC($2);
@@ -514,7 +555,7 @@ expression  : expression PLUSOP expression  {
 
 
                                                 // CASO TRUE
-                                                Operacion op3 = operEtiq(etiqTrue);
+                                                Operacion op3 = operEtiq(etiqT);
                                                 insertaLC($$, finalLC($$), op3);
 
                                                 concatenaLC($$, $4);
@@ -534,15 +575,17 @@ expression  : expression PLUSOP expression  {
 
                                             }
 
-            | MINUS expression              { 
+            | MINUSOP expression %prec MINUSOP_UN { 
                                                 $$ = creaLC();
-                                                concatenaLC($$, $1);
-                                                concatenaLC($$, $3);
+                                                concatenaLC($$, $2);
 
-                                                Operacion op = crearOpArit("neg", $2, NULL);
+                                                int temp = nuevoTemp();
+                                                char tempStr[5];
+                                                sprintf(tempStr, "$t%d", temp);
 
-                                                liberaLC($1);
-                                                liberaLC($3);
+                                                Operacion op = crearOpArit("neg", recuperaResLC($2), NULL, tempStr);
+
+                                                liberaLC($2);
                                                 insertaLC($$, finalLC($$), op);
                                                 guardaResLC($$, strdup(tempStr));
                                             }
@@ -555,20 +598,30 @@ expression  : expression PLUSOP expression  {
                                                     char nombreVar[20];
                                                     sprintf(nombreVar, "_%s", $1);
 
-                                                    Operacion op = crearOpArit("lw", strdup(nombreVar), NULL);
+                                                    int temp = nuevoTemp();
+                                                    char tempStr[5];
+                                                    sprintf(tempStr, "$t%d", temp);
+
+                                                    Operacion op = crearOpArit("lw", strdup(nombreVar), NULL, tempStr);
 
                                                     insertaLC($$, finalLC($$), op);
                                                     guardaResLC($$, strdup(tempStr));
                                                 }
                                                 else{
-                                                    printf("Error semántico: Variable no declarada '%s' (linea: %d)\n", yylineno, $3);
+                                                    printf("Error semántico: Variable no declarada '%s' (linea: %d)\n", yylineno, $1);
                                                     YYERROR;
                                                 }
 
                                             }
-            | NUM                           { 
+            | ENTERO                        { 
                                                 $$ = creaLC();
-                                                Operacion op = crearOpArit("li", $1, NULL);
+
+                                                int temp = nuevoTemp();
+                                                char tempStr[5];
+                                                sprintf(tempStr, "$t%d", temp);
+
+                                                Operacion op = crearOpArit("li", $1, NULL, tempStr);
+                                                
                                                 insertaLC($$, finalLC($$), op);
                                                 guardaResLC($$, strdup(tempStr));
                                             }
@@ -577,12 +630,11 @@ expression  : expression PLUSOP expression  {
 %%
 
 /*          ******* IMPLEMENTACION FUNCIONES VIDEOS ******* 
- *               faltan: imprimirTablaS, imprimirTablaC
  */
 
-bool perteneceTablaS(char *nombre)
-    return buscaLS(tablaSimb, nombre) != finalLS(t); // si son diferentes está $1 (nombre) en la tabla de sibolos
-
+bool perteneceTablaS(char *nombre){
+    return buscaLS(tablaSimb, nombre) != finalLS(tablaSimb);
+}
 
 void anadeEntrada(char *nombre, Tipo t, int v){
     Simbolo s;
@@ -592,56 +644,11 @@ void anadeEntrada(char *nombre, Tipo t, int v){
     insertaLS(tablaSimb, finalLS(tablaSimb), s);
 }
 
-bool esConstante(char *nombre)
+bool esConstante(char *nombre){
     return recuperaLS(tablaSimb, buscaLS(tablaSimb, nombre)).tipo == CONSTANTE; // sacamos el indice del simbolo en la tabla y luego rescatamos el simbolo y comprobamos el tipo
-
-
-/*         ******* FUNCION SOLO PARA expression ******* 
-     PORQUE EL RESTO ENCADENA VARIAS COSAS Y NO TIENE SENTIDO
-        PERO LO QUE ES SUMAR, RESTAR, ETC. ES SISTEMATICO
-           ENTONCES CLARO, ASI ME AHORRO ERRORES TONTOS
-*/
-Operacion crearOpArit(char * op, char *oper1, char *oper2){
-    int temp = nuevoTemp();
-    char tempStr[5];
-    sprintf(tempStr, "$t%d", temp);
-    Operacion operacion = {
-        .op = op,
-        .res = strdup(tempStr),
-        .arg1 = recuperaResLC(oper1),
-        .arg2 = recuperaResLC(oper2)
-    };
-    return operacion;
 }
 
-Operacion operEtiq (char* etiq){
-    Operacion op = {
-        .op = etiq,
-        .res = NULL,
-        .arg1 = NULL,
-        .arg2 = NULL
-    };
-    return op;
-}
-
-Operacion operSaltoCond (char* salto, char* exp, char* etiq){
-    Operacion op = {
-        .op = salto,
-        .res = recuperaResLC(exp),
-        .arg1 = etiq,
-        .arg2 = NULL
-    };
-    return op;
-}
-
-
-// inicializa TODOS los temporales
-void inicializaTemporales(){
-	for(int i = 0; i<NUMERO_TEMPORALES;i++)
-		temp[i] = 0;
-}
-
-void imprimirLC(ListaC codigo){
+void imprimeLC(ListaC codigo){
         PosicionListaC pos = inicioLC(codigo);
         Operacion oper;
         while (pos != finalLC(codigo)) {
@@ -659,28 +666,72 @@ void imprimirLC(ListaC codigo){
         }
 }
 
-void imprimirLS(){
-    PosicionLista pos = inicioLS(tablaSimbtablaSimb);
+void imprimirTablaS(){
+    PosicionLista pos = inicioLS(tablaSimb);
     printf(".data\n");
     while (pos != finalLS(tablaSimb)) {
-        Simbolo s = recuperaLS(l,pos);
+        Simbolo s = recuperaLS(tablaSimb, pos);
         if (s.tipo == CADENA)
             printf("$str%d:\n       .asciiz %s\n",s.valor, s.nombre);
         else
             printf("_%s:\n          .word 0\n",s.nombre); 
         
-        pos = siguienteLS(l,pos);
+        pos = siguienteLS(tablaSimb,pos);
     }
     printf(".text\n.globl main\nmain:\n");
 }
+
+/*         ******* FUNCION SOLO PARA expression ******* 
+     PORQUE EL RESTO ENCADENA VARIAS COSAS Y NO TIENE SENTIDO
+        PERO LO QUE ES SUMAR, RESTAR, ETC. ES SISTEMATICO
+           ENTONCES CLARO, ASI ME AHORRO ERRORES TONTOS
+*/
+Operacion crearOpArit(char * op, char *oper1, char *oper2, char tempStr[5]){
+    Operacion operacion = {
+        .op = op,
+        .res = strdup(tempStr),
+        .arg1 = oper1,
+        .arg2 = oper2
+    };
+    return operacion;
+}
+
+Operacion operEtiq (char* etiq){
+    Operacion op = {
+        .op = etiq,
+        .res = NULL,
+        .arg1 = NULL,
+        .arg2 = NULL
+    };
+    return op;
+}
+
+Operacion operSaltoCond (char* salto, char* exp, char* etiq){
+    Operacion op = {
+        .op = salto,
+        .res = exp,
+        .arg1 = etiq,
+        .arg2 = NULL
+    };
+    return op;
+}
+
+
+// inicializa TODOS los temporales
+void inicializaTemporales(){
+	for(int i = 0; i<N_TEMP;i++)
+		tmp[i] = 0;
+}
+
+
 
 
 // PARA RESERVAR EL PRIMER TEMPORAL LIBRE
 int nuevoTemp(){
 	int i = 0;
-	while(i<NUMERO_TEMPORALES){
-		if(temp[i]==0){
-			temp[i] = 1;
+	while(i<N_TEMP){
+		if(tmp[i]==0){
+			tmp[i] = 1;
 			return i;
 		}
 		i++;
@@ -691,7 +742,7 @@ int nuevoTemp(){
 
 char* nuevaEtiq() {
     char* etiq = malloc(10);
-    sprintf(etiq, "$l%d", contadorEtiq++);
+    sprintf(etiq, "$l%d", contEtiquetas++);
     return etiq;
 }
 

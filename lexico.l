@@ -1,6 +1,8 @@
 %{
-#include "lexico.h"
+#include <stdio.h>
 #include "math.h" 
+#include "listaCodigo.h"
+#include "sintaxis.tab.h"
 #include "listaSimbolos.h"
 void error_lexico();  
 %}
@@ -23,7 +25,7 @@ letra               [a-zA-Z]
 "if"                                        return IF;
 "else"                                      return ELSE;
 "while"                                     return WHILE;
-"printf"                                    return PRINTF;
+"print"                                    return PRINTF;
 "read"                                      return READ;    
  /* CARACTERES ESPECIALES */
 ";"                                         return DOTCOMMA;
@@ -45,18 +47,18 @@ letra               [a-zA-Z]
 
  /* VALORES LITERALES */
 {digito}+                                   {   if(atol(yytext)>pow(2,31))
-                                    		        error_lexico("entero más grande que 2^31");
+                                    		        printf("Entero más grande que 2^31\n");
                                                 else{
                                                     yylval.lexema = strdup(yytext);
                                                     return ENTERO;
                                                 }
                                             }
 \"([^"\n\\]|\\[ntr"])*\"                    {   yylval.lexema= strdup(yytext);
-                                                return CADENA;
+                                                return STRING;
                                             }
  /* IDENTIFICADOR */
 ({letra}|_)(_|{digito}|{letra})*            {   if (yyleng > 32)
-                                                    error_lexico("ID tiene más de 32 caracteres");  // return id para que el sintactico no se quede esperando
+                                                    printf("ID tiene más de 32 caracteres\n");  // return id para que el sintactico no se quede esperando
                                                 else{
                                                     yylval.lexema =strdup(yytext);
                                                     return ID;
