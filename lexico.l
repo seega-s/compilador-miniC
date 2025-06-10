@@ -9,13 +9,16 @@ void error_lexico();
 digito              [0-9]
 letra               [a-zA-Z]
 %option yylineno
+%x                  COMENTARIO
 
 %%
+"//"(.*)[\n\r]                              ;                  
+[ \t\n\r]+                                  ;  /*Ignorar espacios, tabulaciones y saltos de línea*/
 
- /* COMENTARIOS Y CARACTERES QUE HAY QUE SKIPPEAR (saltos, tabs, etc.) */
-"//".*[\n]                                  ;
-"/*"([^*]|\*[^/])*\*\/                      ;
-[ \n\t\r]+                            	    ;
+"/*" 								        BEGIN COMENTARIO;
+<COMENTARIO>[^*]* 						    ;
+<COMENTARIO>[*]+[/]						    BEGIN 0;
+<COMENTARIO>[*]+[^/*]*					    ;
 
 
  /* PALABRAS RESERVADAS */
@@ -25,7 +28,7 @@ letra               [a-zA-Z]
 "if"                                        return IF;
 "else"                                      return ELSE;
 "while"                                     return WHILE;
-"print"                                    return PRINTF;
+"print"                                     return PRINT;
 "read"                                      return READ;    
  /* CARACTERES ESPECIALES */
 ";"                                         return DOTCOMMA;

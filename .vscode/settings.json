@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "listacodigo.h": "c",
+        "stdlib.h": "c"
+    }
+}
