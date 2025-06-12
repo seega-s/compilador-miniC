@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include "listaSimbolos.h"
 #include "listaCodigo.h"
 
@@ -21,6 +22,7 @@ void inicializaTemporales();
 void liberaTemporal(char * registro);
 int nuevoTemp();
 char* nuevaEtiq();
+bool error_check = false;
 
 void imprimirTablaS();
 void imprimeLC(ListaC codigo);
@@ -43,8 +45,9 @@ void yyerror(char *s);
 %token VAR CONST INT IF ELSE WHILE PRINT READ DOTCOMMA COMMA PLUSOP MINUSOP MULTOP DIVOP LPAREN RPAREN LBRACE RBRACE QMARK COLON ASIGN MINUSOP_UN
 %type <codigo> expression statement statement_list print_list print_item read_list declarations var_list const_list
 
-%left PLUSOP MINUSOP MULTOP DIVOP ASIGN MINUSOP_UN
-
+%left PLUSOP MINUSOP
+%left MULTOP DIVOP
+%left MINUSOP_UN
 
 %%
 
@@ -55,7 +58,7 @@ program     : {tablaSimb = creaLS();} ID LPAREN RPAREN LBRACE declarations state
                                                                                                     liberaLC($6);
                                                                                                     liberaLC($7);
                                                                                                     imprimirTablaS();
-                                                                                                    imprimeLC(codigo);
+                                                                                                    if (!error_check){imprimeLC(codigo);}
                                                                                                     liberaLS(tablaSimb);
                                                                                                     liberaLC(codigo); 
                                                                                                 }
@@ -66,7 +69,7 @@ declarations: declarations VAR tipo var_list DOTCOMMA       {
 	        | declarations CONST tipo const_list DOTCOMMA   {   
                                                                 $$ = $1;
                                                                 concatenaLC($$, $4);
-                                                                //liberaLC($4);
+                                                                liberaLC($4);
                                                             }
 	        | /* empty */                                   {
                                                                 $$ = creaLC();
@@ -83,6 +86,7 @@ var_list    : ID                            {
                                                     anadeEntrada($1, VARIABLE, 0);
                                                 else {
                                                     printf("Error semántico: Variable ya declarada '%s' (linea: %d)\n", $1, yylineno);
+                                                    error_check = true;
                                                     YYERROR; // en semBison pone que hay que abortar así
                                                 }
                                             }
@@ -91,6 +95,7 @@ var_list    : ID                            {
                                                     anadeEntrada($3, VARIABLE, 0);
                                                 else {
                                                     printf("Error semántico: Variable ya declarada '%s' (linea: %d)\n", $1, yylineno);
+                                                    error_check = true;
                                                     YYERROR; // en semBison pone que hay que abortar así
                                                 }
                                             }
@@ -117,6 +122,7 @@ const_list  : ID ASIGN expression           {
                                                 }
                                                 else {
                                                     printf("Error semántico: Variable ya declarada '%s' (linea: %d)\n", $1, yylineno);
+                                                    error_check = true;
                                                     YYERROR; // en semBison pone que hay que abortar así
                                                 }
                                             }
@@ -144,6 +150,7 @@ const_list  : ID ASIGN expression           {
                                                         }
                                                         else {
                                                             printf("Error semántico: Constante ya declarada '%s' (linea: %d)\n", $1, yylineno);
+                                                            error_check = true;
                                                             YYERROR; // Aborta el análisis sintáctico****
                                                         }
                                                     }
@@ -153,6 +160,7 @@ statement_list  : statement_list statement  {
     
                                                 concatenaLC($1, $2);
                                                 $$ = $1;
+                                                liberaLC($2);
                                             }
                 | /* empty */               { 
                                                 $$ = creaLC();
@@ -162,10 +170,12 @@ statement_list  : statement_list statement  {
 statement   : ID ASIGN expression DOTCOMMA  {   
                                                 if (!perteneceTablaS($1)){
                                                     printf("Error semántico: Variable no declarada '%s' (linea: %d)\n", $1, yylineno);
+                                                    error_check = true;
                                                     YYERROR;
                                                 }
                                                 else if (esConstante($1)){
                                                     printf("Error semántico: Asignación a constante '%s' (linea: %d)\n", $1, yylineno);
+                                                    error_check = true;
                                                     YYERROR;
                                                 }
                                                 else{
@@ -182,7 +192,7 @@ statement   : ID ASIGN expression DOTCOMMA  {
                                                     };
                                                     insertaLC($$, finalLC($$), op);
                                                     inicializaTemporales();
-                                                    
+                                                    liberaLC($3);
                                                 }
                                             }
             | LBRACE statement_list RBRACE  { 
@@ -195,15 +205,16 @@ statement   : ID ASIGN expression DOTCOMMA  {
 
                                                                         //ANALISIS, si se da se salta al if
                                                                         concatenaLC($$, $3);
+                                                                        
                                                                         Operacion opCond = operSaltoCond("bnez", recuperaResLC($3), etiqIf);
                                                                         insertaLC($$, finalLC($$), opCond);
                                                                         inicializaTemporales();
-                                                                        
+                                                                        liberaLC($3);
                                                                         liberaTemporal(recuperaResLC($3));
 
                                                                         //ELSE
                                                                         concatenaLC($$, $7);
-                                                                        
+                                                                        liberaLC($7);
                                                                         
                                                                         Operacion opSaltoFin = {
                                                                             .op = "b",
@@ -218,7 +229,7 @@ statement   : ID ASIGN expression DOTCOMMA  {
                                                                         Operacion opIf = operEtiq(etiqIf);
                                                                         insertaLC($$, finalLC($$), opIf);
                                                                         concatenaLC($$, $5);
-                                                                        
+                                                                        liberaLC($5);
 
                                                                         // F IN
                                                                         Operacion opFin = operEtiq(etiqFin);
@@ -235,8 +246,10 @@ statement   : ID ASIGN expression DOTCOMMA  {
                                                         Operacion opCond = operSaltoCond("beqz", recuperaResLC($3), etiqFin);
                                                         insertaLC($$, finalLC($$), opCond);
                                                         liberaTemporal(recuperaResLC($3));
+                                                        liberaLC($3);
 
                                                         concatenaLC($$, $5);
+                                                        liberaLC($5);
 
                                                         Operacion opEtiq = operEtiq(etiqFin);
                                                         insertaLC($$, finalLC($$), opEtiq);
@@ -255,11 +268,11 @@ statement   : ID ASIGN expression DOTCOMMA  {
 
                                                             Operacion opCond = operSaltoCond("beqz", recuperaResLC($3), etiqFin);
                                                             insertaLC($$, finalLC($$), opCond);
-                                                            
+                                                            liberaLC($3);
                                                             liberaTemporal(recuperaResLC($3));
 
                                                             concatenaLC($$, $5);
-                                                            
+                                                            liberaLC($5);
                                                             
                                                             
                                                             
@@ -280,11 +293,13 @@ statement   : ID ASIGN expression DOTCOMMA  {
             | PRINT LPAREN print_list RPAREN DOTCOMMA  {
                                                             $$ = creaLC();
                                                             concatenaLC($$, $3);
+                                                            liberaLC($3);
                                                         }
                                                         
             | READ LPAREN read_list RPAREN DOTCOMMA     { 
                                                             $$ = creaLC();
                                                             concatenaLC($$, $3);
+                                                            liberaLC($3);
                                                         }
                                                         ;
 
@@ -293,6 +308,7 @@ print_list  : print_item                    {
                                             }
 	        | print_list COMMA print_item   {
                                                 concatenaLC($1, $3);
+                                                liberaLC($3);
                                                 $$ = $1;
                                             }
                                             ;
@@ -373,10 +389,12 @@ print_item  : expression                    {
 read_list   : ID                            {   //COMPRObACIONAS INICIALES
                                                 if (!perteneceTablaS($1)) {
                                                     printf("Error semántico: Variable no declarada '%s' (linea: %d)\n", $1, yylineno);
+                                                    error_check = true;
                                                     YYERROR;
                                                 }
                                                 else if (esConstante($1)){
                                                     printf("Error semántico: Asignación a constante '%s' (linea: %d)\n", $1, yylineno);
+                                                    error_check = true;
                                                     YYERROR;
                                                 }
                                                 else{   // aquí iba a crear funciones pero no tenian sentido porque basicamente seria practicamente igual y se llamarian 3 veces contadas
@@ -413,10 +431,12 @@ read_list   : ID                            {   //COMPRObACIONAS INICIALES
 	        | read_list COMMA ID            {   
                                                 if (!perteneceTablaS($3)) {
                                                     printf("Error semántico: Variable no declarada '%s' (linea: %d)\n", $3, yylineno);
+                                                    error_check = true;
                                                     YYERROR;
                                                 }
                                                 else if (esConstante($3)){
                                                     printf("Error semántico: Asignación a constante '%s' (linea: %d)\n", $3, yylineno);
+                                                    error_check = true;
                                                     YYERROR;
                                                 }
                                                 else{
@@ -463,6 +483,8 @@ expression  : expression PLUSOP expression  {
                                                 liberaTemporal(recuperaResLC($3));
 
                                                 guardaResLC($$, strdup(recuperaResLC($1)));
+                                                liberaLC($1);
+                                                liberaLC($3);
                                                 insertaLC($$, finalLC($$), op);
                                             }
             | expression MINUSOP expression { 
@@ -475,6 +497,8 @@ expression  : expression PLUSOP expression  {
                                                 liberaTemporal(recuperaResLC($3));
 
                                                 guardaResLC($$, strdup(recuperaResLC($1)));
+                                                liberaLC($1);
+                                                liberaLC($3);
                                                 insertaLC($$, finalLC($$), op);
 
                                             }
@@ -488,6 +512,8 @@ expression  : expression PLUSOP expression  {
                                                 liberaTemporal(recuperaResLC($3));
 
                                                 guardaResLC($$, strdup(recuperaResLC($1)));
+                                                liberaLC($1);
+                                                liberaLC($3);
                                                 insertaLC($$, finalLC($$), op);
 
                                             }
@@ -501,6 +527,8 @@ expression  : expression PLUSOP expression  {
                                                 liberaTemporal(recuperaResLC($3));
 
                                                 guardaResLC($$, strdup(recuperaResLC($1)));
+                                                liberaLC($1);
+                                                liberaLC($3);
                                                 insertaLC($$, finalLC($$), op);
                                             }
             | LPAREN expression QMARK expression COLON expression RPAREN 
@@ -579,6 +607,7 @@ expression  : expression PLUSOP expression  {
 
                                                 insertaLC($$, finalLC($$), op);
                                                 guardaResLC($$, strdup(recuperaResLC($2)));
+                                                liberaLC($2);
                                             }
             | LPAREN expression RPAREN      { 
                                                 $$ = $2;
@@ -600,6 +629,7 @@ expression  : expression PLUSOP expression  {
                                                 }
                                                 else{
                                                     printf("Error semántico: Variable no declarada '%s' (linea: %d)\n", $1, yylineno);
+                                                    error_check = true;
                                                     YYERROR;
                                                 }
 

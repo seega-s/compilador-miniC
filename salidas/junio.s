@@ -52,14 +52,14 @@ main:
 	sw $t0,_c
 	lw $t0,_a
 	lw $t1,_b
+	li $t2,20
+	mul $t1,$t1,$t2
 	add $t0,$t0,$t1
-	li $t1,20
-	mul $t0,$t0,$t1
 	lw $t1,_b
 	li $t2,19
+	li $t3,2
+	div $t2,$t2,$t3
 	add $t1,$t1,$t2
-	li $t2,2
-	div $t1,$t1,$t2
 	sub $t0,$t0,$t1
 	li $t1,2
 	div $t0,$t0,$t1
