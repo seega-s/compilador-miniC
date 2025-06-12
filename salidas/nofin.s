@@ -1,0 +1,1 @@
+Error sintáctico en línea 11 cerca de '': syntax error

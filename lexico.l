@@ -1,9 +1,7 @@
 %{
 #include <stdio.h>
 #include "math.h" 
-#include "listaCodigo.h"
 #include "sintaxis.tab.h"
-#include "listaSimbolos.h"
 void error_lexico();  
 %}
 digito              [0-9]
@@ -45,8 +43,7 @@ letra               [a-zA-Z]
 ":"                                         return COLON;
 "="                                         return ASIGN;
 
- /* ERRORES TODO LO QUE NO SEA + FUNCION */
-([^A-Za-z0-9_\+\-\/\*{}();,"\[\?\:\n\r\t\ ])+   error_lexico(); // todo lo que no sea lo anterior
+
 
  /* VALORES LITERALES */
 {digito}+                                   {   if(atol(yytext)>pow(2,31))
@@ -56,7 +53,7 @@ letra               [a-zA-Z]
                                                     return ENTERO;
                                                 }
                                             }
-\"([^"\n\\]|\\[ntr"])*\"                    {   yylval.lexema= strdup(yytext);
+\"([^"\n\\]|\\[ntr"\\])*\"                  {   yylval.lexema= strdup(yytext);
                                                 return STRING;
                                             }
  /* IDENTIFICADOR */
@@ -67,6 +64,8 @@ letra               [a-zA-Z]
                                                     return ID;
                                                 }
                                             }
+ /* ERRORES TODO LO QUE NO SEA + FUNCION */
+([^A-Za-z0-9_\+\-\/\*{}();,"\[\?\:\n\r\t\ ])+   error_lexico(); // todo lo que no sea lo anterior
 %%
 void error_lexico(){
     printf("Error léxico en la línea %d: %s \n", yylineno, yytext);

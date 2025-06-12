@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "listaSimbolos.h"
-#include "sintaxis.tab.h"
 #include "listaCodigo.h"
 
 extern char *yytext;
@@ -277,12 +276,12 @@ statement   : ID ASIGN expression DOTCOMMA  {
                                                             Operacion opEtiqFin = operEtiq(etiqFin);
                                                             insertaLC($$, finalLC($$), opEtiqFin);
                                                         }
-                                                        ;
+                                                        
             | PRINT LPAREN print_list RPAREN DOTCOMMA  {
                                                             $$ = creaLC();
                                                             concatenaLC($$, $3);
                                                         }
-                                                        ;
+                                                        
             | READ LPAREN read_list RPAREN DOTCOMMA     { 
                                                             $$ = creaLC();
                                                             concatenaLC($$, $3);
@@ -422,6 +421,7 @@ read_list   : ID                            {   //COMPRObACIONAS INICIALES
                                                 }
                                                 else{
                                                     $$ = creaLC();
+                                                    concatenaLC($$, $1);
                                                     // li   $v0, 5
                                                     // syscalñ
                                                     Operacion op1 = {
@@ -458,14 +458,11 @@ expression  : expression PLUSOP expression  {
                                                 concatenaLC($$, $1);
                                                 concatenaLC($$, $3);
 
-                                                int temp = nuevoTemp();
-                                                char tempStr[5];
-                                                sprintf(tempStr, "$t%d", temp);
 
-                                                Operacion op = crearOpArit("add", recuperaResLC($1), recuperaResLC($3), tempStr);
+                                                Operacion op = crearOpArit("add", recuperaResLC($1), recuperaResLC($3), recuperaResLC($1));
                                                 liberaTemporal(recuperaResLC($3));
 
-                                                guardaResLC($$, strdup(tempStr));
+                                                guardaResLC($$, strdup(recuperaResLC($1)));
                                                 insertaLC($$, finalLC($$), op);
                                             }
             | expression MINUSOP expression { 
@@ -473,14 +470,11 @@ expression  : expression PLUSOP expression  {
                                                 concatenaLC($$, $1);
                                                 concatenaLC($$, $3);
 
-                                                int temp = nuevoTemp();
-                                                char tempStr[5];
-                                                sprintf(tempStr, "$t%d", temp);
 
-                                                Operacion op = crearOpArit("sub", recuperaResLC($1), recuperaResLC($3), tempStr);
+                                                Operacion op = crearOpArit("sub", recuperaResLC($1), recuperaResLC($3), recuperaResLC($1));
                                                 liberaTemporal(recuperaResLC($3));
 
-                                                guardaResLC($$, strdup(tempStr));
+                                                guardaResLC($$, strdup(recuperaResLC($1)));
                                                 insertaLC($$, finalLC($$), op);
 
                                             }
@@ -489,14 +483,11 @@ expression  : expression PLUSOP expression  {
                                                 concatenaLC($$, $1);
                                                 concatenaLC($$, $3);
 
-                                                int temp = nuevoTemp();
-                                                char tempStr[5];
-                                                sprintf(tempStr, "$t%d", temp);
 
-                                                Operacion op = crearOpArit("mul", recuperaResLC($1), recuperaResLC($3), tempStr);
+                                                Operacion op = crearOpArit("mul", recuperaResLC($1), recuperaResLC($3), recuperaResLC($1));
                                                 liberaTemporal(recuperaResLC($3));
 
-                                                guardaResLC($$, strdup(tempStr));
+                                                guardaResLC($$, strdup(recuperaResLC($1)));
                                                 insertaLC($$, finalLC($$), op);
 
                                             }
@@ -505,14 +496,11 @@ expression  : expression PLUSOP expression  {
                                                 concatenaLC($$, $1);
                                                 concatenaLC($$, $3);
 
-                                                int temp = nuevoTemp();
-                                                char tempStr[5];
-                                                sprintf(tempStr, "$t%d", temp);
 
-                                                Operacion op = crearOpArit("div", recuperaResLC($1), recuperaResLC($3), tempStr);
+                                                Operacion op = crearOpArit("div", recuperaResLC($1), recuperaResLC($3), recuperaResLC($1));
                                                 liberaTemporal(recuperaResLC($3));
 
-                                                guardaResLC($$, strdup(tempStr));
+                                                guardaResLC($$, strdup(recuperaResLC($1)));
                                                 insertaLC($$, finalLC($$), op);
                                             }
             | LPAREN expression QMARK expression COLON expression RPAREN 
@@ -587,14 +575,10 @@ expression  : expression PLUSOP expression  {
                                                 $$ = creaLC();
                                                 concatenaLC($$, $2);
 
-                                                int temp = nuevoTemp();
-                                                char tempStr[5];
-                                                sprintf(tempStr, "$t%d", temp);
-
-                                                Operacion op = crearOpArit("neg", recuperaResLC($2), NULL, tempStr);
+                                                Operacion op = crearOpArit("neg", recuperaResLC($2), NULL, recuperaResLC($2));
 
                                                 insertaLC($$, finalLC($$), op);
-                                                guardaResLC($$, strdup(tempStr));
+                                                guardaResLC($$, strdup(recuperaResLC($2)));
                                             }
             | LPAREN expression RPAREN      { 
                                                 $$ = $2;
@@ -692,8 +676,8 @@ void imprimeLC(ListaC codigo){
         }
         printf("\n");
     }
-    printf("##############\n");
-    printf("# Fin\n");
+    
+    printf("#\tFin\n");
     printf("\tli $v0, 10\n");
     printf("\tsyscall\n");
 
